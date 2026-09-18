@@ -1,0 +1,19 @@
+# SIH Signal Analyzer — Python dependencies
+# Install into the project venv:
+#   python -m pip install -r requirements.txt
+
+# Core ML / numeric
+torch
+numpy
+h5py
+
+# GUI
+PyQt6
+pyqtgraph
+
+# FEC decoders (new additions)
+commpy       # Viterbi decoder (convolutional codes)
+reedsolo     # Reed-Solomon decoder
+
+# Note: GNU Radio is installed separately (system-wide / conda) — not pip-installable.
+# See: https://www.gnuradio.org/doc/doxygen/page_install.html

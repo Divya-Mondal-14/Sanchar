@@ -1,0 +1,81 @@
+# =============================================================================
+# SIH Signal Analyzer - Root .gitignore
+# =============================================================================
+
+# --- Virtual Environments ---
+venv/
+venv*/
+env/
+.env/
+ENV/
+env.bak/
+venv.bak/
+conda-env/
+.conda/
+signal-analyzer/venv/
+signal-analyzer/venv*/
+signal-analyzer/venv312/
+
+# --- Python Bytecode & Cache ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+*.pyo
+*.pyd
+
+# --- Distribution & Build ---
+build/
+dist/
+*.egg-info/
+*.egg
+
+# --- IDEs, Editors & Workspaces ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.settings/
+
+# --- Operating System Files ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Logs, Temp & Tests ---
+*.log
+*.tmp
+*.temp
+.pytest_cache/
+.mypy_cache/
+.coverage
+
+# --- Model Checkpoints & Large Weights ---
+# General PyTorch checkpoints rule:
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.weights
+*.h5
+
+# CRITICAL EXCEPTION: Keep the pre-trained neural network classifier!
+!**/models/modclassifier_best.pth
+
+# --- Heavy / Ad-hoc Test & Raw RF Capture Data ---
+*.raw
+*.iq.dump
+*.pcap
+*.pcapng
+*.mat
+*.dat
+
+# Keep bundled lightweight demonstration samples
+!**/synthetic_*.wav
+!**/test_*.wav
+!**/test_data/test_samples.json
+
+# --- Local Environment Overrides ---
+.env.local
+gnuradio_path.pth

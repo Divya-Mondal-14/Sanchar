@@ -1,0 +1,9 @@
+{
+  "classes": [
+    "BPSK",
+    "QPSK",
+    "GMSK"
+  ],
+  "input_len": 1024,
+  "channels_first": true
+}
