@@ -158,3 +158,25 @@ Payload Extraction
      ▼
 Analysis Report
 
+⚡ Key Features
+1. Dual-Format Signal Input
+
+Sanchar supports:
+.IQ
+.WAV
+The input data is converted into a suitable complex I/Q representation for further processing.
+
+2. Automatic Signal Preprocessing
+
+The preprocessing stage includes:
+
+DC offset removal
+Signal normalization
+I/Q separation
+Signal windowing
+Frame segmentation
+Sample preparation for analysis
+
+I/Q samples are normalized for consistent downstream processing.
+
+
