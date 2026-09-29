@@ -12,9 +12,9 @@
 **A Sovereign, First-Principles Deep Learning + GNU Radio DSP Pipeline for Defense ELINT/SIGINT & Spectrum Surveillance**
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Domain-Defense_ELINT%20%2F%20SIGINT-red?style=for-the-badge&logo=target" alt="Defense ELINT/SIGINT" />
+  <img src="https://img.shields.io/badge/Problem_Statement_ID-SIH26147-red?style=for-the-badge&logo=target" alt="Problem Statement ID SIH26147" />
   <img src="https://img.shields.io/badge/Organization-NTRO_(National_Technical_Research_Organisation)-003366?style=for-the-badge&logo=shield" alt="NTRO" />
-  <img src="https://img.shields.io/badge/Theme-Smart_Automation-teal?style=for-the-badge" alt="Smart Automation" />
+  <img src="https://img.shields.io/badge/Theme-Space_Technology-teal?style=for-the-badge" alt="Space Technology" />
   <img src="https://img.shields.io/badge/Team-Caffeine_Coders-orange?style=for-the-badge" alt="Caffeine Coders" />
 </p>
 
@@ -43,13 +43,13 @@
 
 </div>
 
-> **Sanchar Signal Analyzer** (*संचार-विश्लेषक* — Sanskrit for *Strategic Communication & RF Intelligence Exploitation Engine*) is an indigenous, first-principles, high-performance blind signal processing pipeline engineered in Python, PyTorch, and GNU Radio C++ DSP acceleration. Developed by **Team Caffeine Coders** for sovereign spectrum defense and non-cooperative intelligence (**ELINT / SIGINT**), it provides an uncompromised alternative to foreign proprietary radio analysis platforms (Keysight 89600 VSA, Rohde & Schwarz Vector Signal Explorer) for intercepting, classifying, demodulating, de-interleaving, and decoding raw wireless bitstreams with zero prior transmission metadata.
+> **Sanchar Signal Analyzer** (*संचार-विश्लेषक* — Sanskrit for *Strategic Communication & RF Intelligence Exploitation Engine*) is an indigenous, first-principles, high-performance blind signal processing pipeline engineered in Python, PyTorch, and GNU Radio C++ DSP acceleration. Developed by **Team Caffeine Coders** for sovereign spectrum defense and non-cooperative intelligence (**ELINT / SIGINT**) under **Problem Statement ID SIH26147**, it provides an uncompromised alternative to foreign proprietary radio analysis platforms (Keysight 89600 VSA, Rohde & Schwarz Vector Signal Explorer) for intercepting, classifying, demodulating, de-interleaving, and decoding raw wireless bitstreams with zero prior transmission metadata.
 
 ---
 
 ## 📑 Table of Contents
 
-- [National Significance & Operational Challenge](#-national-significance--operational-challenge)
+- [National Significance & Problem Statement](#-national-significance--problem-statement-id-sih26147)
 - [Key Highlights & Sovereign Innovations](#-key-highlights--sovereign-innovations)
 - [Core System Architecture](#-core-system-architecture)
 - [Modern Operational Dashboard & Prototype](#-modern-operational-dashboard--prototype)
@@ -67,15 +67,16 @@
 
 ---
 
-## 🇮🇳 National Significance & Operational Challenge
+## 🇮🇳 National Significance & Problem Statement (ID: SIH26147)
 
 ### 🎯 Problem Statement Overview
 | Parameter | Description |
 | :--- | :--- |
-| **Operational Mission** | **Autonomous Blind Signal Classification, Demodulation, Frame Sync, De-interleaving & FEC Decoding** |
-| **Domain** | **Non-Cooperative Signal Intelligence (SIGINT) / Electronic Intelligence (ELINT)** |
+| **Problem Statement ID** | **SIH26147** |
+| **Problem Statement Title** | **Automated model for analysis of .IQ and .wav files along with signal parameter extraction** |
 | **Organization** | **National Technical Research Organisation (NTRO)** |
-| **Theme** | **Smart Automation / Defense & Intelligence** |
+| **Theme** | **Space Technology** |
+| **Category** | **Software** |
 | **Developing Team** | **Team Caffeine Coders** |
 
 ### 🛰️ The Strategic Intelligence Challenge
@@ -113,7 +114,7 @@ In electronic intelligence (ELINT), military signal surveillance (SIGINT), and s
   Hardware-emulated Viterbi soft/hard convolutional decoders ($k=7$ CCSDS polynomials $[0o171, 0o133]$, $k=3$) and Reed-Solomon algebraic block decoders (RS 128,120) with Berlekamp-Massey and Chien search verification.
 - **3-Layer False-Positive Defense:**
   Multi-tier confirmation requiring algebraic syndrome zero-residue checks, frame synchronization marker locking, and payload CRC verification before committing to a decoded transmission.
-- **Print-Ready Official NTRO Engineering Report Generator:**
+- **Print-Ready Official Engineering Report Generator:**
   Automated generation of vector-rendered high-resolution A4 PDF reports and responsive HTML documentation directly from live pipeline telemetry and spectral renderings.
 
 ---
@@ -122,8 +123,8 @@ In electronic intelligence (ELINT), military signal surveillance (SIGINT), and s
 
 <!-- Core System Architecture Tag -->
 <div align="center">
-  <img src="assets/System Architecture.png" alt="Sanchar Signal Analyzer Comprehensive End-to-End System Architecture" width="100%" />
-  <p><em>Figure 1: Comprehensive End-to-End Modular Architecture of Sanchar Signal Analyzer.</em></p>
+  <img src="assets/system_architecture.png" alt="Sanchar Signal Analyzer Comprehensive End-to-End System Architecture" width="100%" />
+  <p><em>Figure 1: Comprehensive End-to-End Modular Architecture of Sanchar Signal Analyzer (Problem Statement ID: SIH26147).</em></p>
 </div>
 
 The Sanchar Signal Analyzer architecture is partitioned into high-cohesion, decoupled stages adhering to strict dataflow engineering and sovereign zero-falsification principles:
@@ -163,7 +164,7 @@ The Sanchar Signal Analyzer architecture is partitioned into high-cohesion, deco
 ### 7. Bitstream Correlation & Payload Reconstruction
 - **Payload Assembler:** Strips locked synchronization preambles and extracts clean payload bits.
 - **Export Adapters:** Generates synchronized dual-stream hex dumps with ASCII sidebars, raw binary files, and JSON telemetry records.
-- **Engineering Report Generator:** Compiles vector A4 PDF and responsive HTML documentation with official NTRO institutional branding.
+- **Engineering Report Generator:** Compiles vector A4 PDF and responsive HTML documentation directly from live telemetry.
 
 ---
 
@@ -175,7 +176,7 @@ The Sanchar Signal Analyzer architecture is partitioned into high-cohesion, deco
   <p><em>Figure 2: Real-time Dark-Mode Operational Dashboard of Sanchar Signal Analyzer executing blind BPSK extraction.</em></p>
 </div>
 
-The Sanchar Signal Analyzer GUI is engineered with **PyQt6** and GPU-accelerated **PyQtGraph** canvas widgets, providing military operators with real-time, low-latency telemetry:
+The Sanchar Signal Analyzer GUI is engineered with **PyQt6** and GPU-accelerated **PyQtGraph** canvas widgets, providing operators with real-time, low-latency telemetry:
 
 ### 1. Time-Domain Waveform Display
 - **Real-Time I/Q Streaming:** Overlaid rendering of In-phase ($I$, blue) and Quadrature ($Q$, green) channel envelopes.
@@ -279,37 +280,50 @@ Below is an authentic, unedited execution trace of Sanchar Signal Analyzer proce
 
 ### 1. Analytic Signal Representation & Normalization
 The intercepted RF signal is represented in quadrature baseband form:
+
 $$r(t) = I(t) \cos(2\pi f_c t) - Q(t) \sin(2\pi f_c t) + n(t)$$
+
 where $I(t)$ and $Q(t)$ are the in-phase and quadrature components, $f_c$ is the residual carrier frequency, and $n(t) \sim \mathcal{CN}(0, \sigma^2)$ is complex additive white Gaussian noise. Samples are normalized over window length $N=1024$:
+
 $$\tilde{s}[n] = \frac{s[n] - \mu_s}{\max(|I[n]|, |Q[n]|)}$$
 
 ---
 
 ### 2. Deep Learning 1D Convolutional Neural Network
 Automatic Modulation Recognition is formulated as a maximum a posteriori classification problem:
+
 $$\hat{m} = \arg\max_{m \in \mathcal{M}} P(m \mid \mathbf{X})$$
+
 where $\mathbf{X} \in \mathbb{R}^{2 \times 1024}$ represents the two-channel I/Q input.
 1. **Stage 1 (Feature Extraction):** $\mathbf{H}_1 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_1 * \mathbf{X} + \mathbf{b}_1\right)\right)\right)$ with kernel size $k=7$.
 2. **Stage 2 (Pattern Synthesis):** $\mathbf{H}_2 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_2 * \mathbf{H}_1 + \mathbf{b}_2\right)\right)\right)$ with kernel size $k=5$.
 3. **Stage 3 (Hierarchical Encoding):** $\mathbf{H}_3 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_3 * \mathbf{H}_2 + \mathbf{b}_3\right)\right)\right)$ with kernel size $k=3$.
 4. **Adaptive Aggregation & Dense Classification:**
-   $$\mathbf{z} = \mathbf{W}_{\text{fc2}} \cdot \text{Dropout}_{0.3}\left(\text{ReLU}\left(\mathbf{W}_{\text{fc1}} \cdot \text{AdaptiveAvgPool}(\mathbf{H}_3) + \mathbf{b}_{\text{fc1}}\right)\right) + \mathbf{b}_{\text{fc2}}$$
-   $$P(y = c \mid \mathbf{X}) = \frac{e^{z_c}}{\sum_{j=1}^3 e^{z_j}}$$
+
+$$\mathbf{z} = \mathbf{W}_{\text{fc2}} \cdot \text{Dropout}_{0.3}\left(\text{ReLU}\left(\mathbf{W}_{\text{fc1}} \cdot \text{AdaptiveAvgPool}(\mathbf{H}_3) + \mathbf{b}_{\text{fc1}}\right)\right) + \mathbf{b}_{\text{fc2}}$$
+
+$$P(y = c \mid \mathbf{X}) = \frac{e^{z_c}}{\sum_{j=1}^3 e^{z_j}}$$
 
 ---
 
 ### 3. Spectral Analysis & Occupied Bandwidth
 Power Spectral Density (PSD) is computed via Welch’s periodogram method:
+
 $$\hat{S}_{xx}(f) = \frac{1}{K L U} \sum_{k=1}^K \left| \sum_{n=0}^{L-1} x_k[n] w[n] e^{-j 2\pi f n / f_s} \right|^2$$
+
 where $w[n]$ is a Hanning window and $U = \frac{1}{L}\sum_{n=0}^{L-1} |w[n]|^2$. The 99% Occupied Bandwidth (OBW) satisfies:
+
 $$\int_{f_{\text{low}}}^{f_{\text{high}}} \hat{S}_{xx}(f) df = 0.99 \int_{-f_s/2}^{f_s/2} \hat{S}_{xx}(f) df, \quad \text{OBW} = f_{\text{high}} - f_{\text{low}}$$
 
 ---
 
 ### 4. Cyclostationary Clock Recovery (Oerder-Meyr)
 Symbol timing is extracted from the non-linear second-order cyclostationary transformation:
+
 $$\xi[n] = |r[n]|^2 \implies \Xi(f) = \mathcal{F}\{\xi[n]\}$$
+
 The symbol rate $R_s$ appears as a discrete spectral line in $\Xi(f)$. Samples per symbol is calculated via:
+
 $$\text{SPS} = \text{round}\left(\frac{f_s}{R_s}\right)$$
 
 ---
@@ -318,20 +332,29 @@ $$\text{SPS} = \text{round}\left(\frac{f_s}{R_s}\right)$$
 Phase offset $\theta[n]$ is tracked using a 2nd-order Costas loop phase error detector:
 - **BPSK Error:** $e[n] = I[n] \cdot Q[n]$
 - **QPSK Error:** $e[n] = \text{sign}(I[n]) \cdot Q[n] - \text{sign}(Q[n]) \cdot I[n]$
+
 Because Costas loops suffer from $M$-fold phase ambiguity ($\Delta\theta \in \{0, \frac{\pi}{2}, \pi, \frac{3\pi}{2}\}$), the bitstream correlator evaluates all rotated bitstreams:
+
 $$b_k^{(\theta)} = \text{Slice}\left(e^{j\theta} \cdot (I_k + j Q_k)\right)$$
+
 Cross-correlation against known preamble sequences $\mathbf{p} = [p_0, \dots, p_{L-1}]$ produces:
+
 $$R[m] = \sum_{l=0}^{L-1} (2 b_{m+l} - 1)(2 p_l - 1), \quad Z = \frac{R_{\max} - \mu_R}{\sigma_R}$$
+
 Frame lock is achieved when $Z \ge 3.0$.
 
 ---
 
 ### 6. Algebraic Forward Error Correction (Viterbi & Reed-Solomon)
 - **Viterbi Decoding:** Solves path metric minimization over the trellis:
-  $$\hat{\mathbf{u}} = \arg\min_{\mathbf{u}} \sum_{t=1}^T d_H(\mathbf{y}_t, \text{Enc}(\mathbf{u}_t))$$
+
+$$\hat{\mathbf{u}} = \arg\min_{\mathbf{u}} \sum_{t=1}^T d_H(\mathbf{y}_t, \text{Enc}(\mathbf{u}_t))$$
+
   supporting CCSDS $k=7$ standard polynomials $G_1 = 0o171$, $G_2 = 0o133$.
 - **Reed-Solomon Syndrome Validation:** Evaluates syndrome polynomial $S(x)$ over Galois Field $\text{GF}(2^8)$:
-  $$S_i = \sum_{j=0}^{n-1} r_j \alpha^{i \cdot j}, \quad i \in \{1, 2, \dots, 2t\}$$
+
+$$S_i = \sum_{j=0}^{n-1} r_j \alpha^{i \cdot j}, \quad i \in \{1, 2, \dots, 2t\}$$
+
   A valid transmission strictly requires $S_i = 0 \quad \forall i$.
 
 ---
@@ -380,7 +403,7 @@ In electronic intelligence, emitting false decodes from random channel noise can
 The repository is organized into modular, clean-architecture subsystems:
 
 ```
-c:\Sanchar\signal-analyzer\
+signal-analyzer/
 ├── correlation/              # Frame sync detection & phase ambiguity resolution
 │   └── sync_correlator.py    # Cross-correlator for Barker, CCSDS, HDLC sync words
 ├── gnuradio_pipeline/        # GNU Radio DSP & algebraic channel decoders
@@ -415,7 +438,7 @@ c:\Sanchar\signal-analyzer\
 └── main.py                   # Application entry point
 ```
 
-| Crate / Directory | Responsibility | Primary Interface / Module |
+| Subsystem / Directory | Responsibility | Primary Interface / Module |
 | :--- | :--- | :--- |
 | **`models/`** | PyTorch 1D-CNN for blind modulation classification down to $-2\text{ dB}$ SNR. | `predict_modulation(window)` |
 | **`gnuradio_pipeline/`** | GNU Radio C++ Costas carrier tracking, clock recovery, and algebraic FEC. | `demodulate()`, `try_all_fec()` |
@@ -460,9 +483,9 @@ When an operator launches an analysis pass, the pipeline genuinely invokes the P
 #### Option A: Conda / Radioconda (Recommended)
 
 ```bash
-# 1. Clone the sovereign repository
-git clone https://github.com/your-username/signal-analyzer.git
-cd signal-analyzer
+# 1. Clone the repository
+git clone https://github.com/Divya-Mondal-14/Sanchar.git
+cd Sanchar/signal-analyzer
 
 # 2. Create Conda environment with GNU Radio
 conda create -n signal_analyzer -c conda-forge python=3.11 gnuradio -y
@@ -540,7 +563,9 @@ python chain_test.py synthetic_BPSK_1000kHz_SNR20dB.wav
 
 ### Operational Stakeholder & Patron
 - **Organization:** National Technical Research Organisation (NTRO)
-- **Domain:** Non-Cooperative RF Intelligence (ELINT / SIGINT)
+- **Problem Statement ID:** SIH26147
+- **Problem Statement Title:** Automated model for analysis of .IQ and .wav files along with signal parameter extraction
+- **Theme:** Space Technology
 - **Initiative:** Smart India Hackathon (SIH)
 
 ---
