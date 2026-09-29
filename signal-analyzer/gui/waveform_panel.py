@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
+from gui.theme import apply_plot_theme
 
 # Global dark pyqtgraph configuration
 pg.setConfigOption('background', '#0d1117')
@@ -37,6 +38,7 @@ class WaveformPanel(QWidget):
         self._x_data: np.ndarray = np.array([], dtype=np.float32)
         self._i_data: np.ndarray = np.array([], dtype=np.float32)
         self._q_data: np.ndarray = np.array([], dtype=np.float32)
+        self._theme: str = "dark"
 
         self._setup_ui()
 
@@ -51,10 +53,10 @@ class WaveformPanel(QWidget):
         control_bar.setSpacing(8)
 
         # Channel selector
-        chan_lbl = QLabel("Channel:")
-        chan_lbl.setFont(QFont("Inter", 9, QFont.Weight.Bold))
-        chan_lbl.setStyleSheet("color: #e6edf3;")
-        control_bar.addWidget(chan_lbl)
+        self._chan_lbl = QLabel("Channel:")
+        self._chan_lbl.setFont(QFont("Inter", 9, QFont.Weight.Bold))
+        self._chan_lbl.setStyleSheet("color: #e6edf3;")
+        control_bar.addWidget(self._chan_lbl)
 
         self._channel_combo = QComboBox()
         self._channel_combo.setFont(QFont("Inter", 9))
@@ -362,12 +364,20 @@ class WaveformPanel(QWidget):
             i_val = self._i_data[idx]
             q_val = self._q_data[idx]
             amp = np.sqrt(i_val * i_val + q_val * q_val)
-            self._telemetry_label.setText(
-                f"Sample: <b style='color:#58a6ff;'>{idx:,}</b> | "
-                f"I: <b style='color:#58a6ff;'>{i_val:+.3f}</b> | "
-                f"Q: <b style='color:#3fb950;'>{q_val:+.3f}</b> | "
-                f"Amp: <b style='color:#f0f6fc;'>{amp:.3f}</b>"
-            )
+            if self._theme == "light":
+                self._telemetry_label.setText(
+                    f"Sample: <b style='color:#0969da;'>{idx:,}</b> | "
+                    f"I: <b style='color:#0969da;'>{i_val:+.3f}</b> | "
+                    f"Q: <b style='color:#1a7f37;'>{q_val:+.3f}</b> | "
+                    f"Amp: <b style='color:#1f2328;'>{amp:.3f}</b>"
+                )
+            else:
+                self._telemetry_label.setText(
+                    f"Sample: <b style='color:#58a6ff;'>{idx:,}</b> | "
+                    f"I: <b style='color:#58a6ff;'>{i_val:+.3f}</b> | "
+                    f"Q: <b style='color:#3fb950;'>{q_val:+.3f}</b> | "
+                    f"Amp: <b style='color:#f0f6fc;'>{amp:.3f}</b>"
+                )
         else:
             self._telemetry_label.setText(f"Sample: {idx:,} (Out of Range)")
 
@@ -405,3 +415,156 @@ class WaveformPanel(QWidget):
             x0 = max(0, center - new_half)
             x1 = min(len(self._x_data), center + new_half)
             self._plot.setXRange(x0, x1, padding=0)
+
+    # ------------------------------------------------------------------
+    # Theme Support
+    # ------------------------------------------------------------------
+
+    def set_theme(self, theme: str = "dark"):
+        """Dynamically apply light or dark theme styling."""
+        self._theme = theme
+        apply_plot_theme(self._plot, theme)
+
+        if theme == "light":
+            self._chan_lbl.setStyleSheet("color: #1f2328;")
+            self._channel_combo.setStyleSheet("""
+                QComboBox {
+                    background-color: #ffffff;
+                    color: #1f2328;
+                    border: 1px solid #d0d7de;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    min-width: 150px;
+                    font-weight: 500;
+                }
+                QComboBox:hover {
+                    border-color: #0969da;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #ffffff;
+                    color: #1f2328;
+                    selection-background-color: #0969da;
+                    selection-color: #ffffff;
+                }
+            """)
+            self._btn_zoom_cycles.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #0969da;
+                    border: 1px solid #0969da;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-weight: 600;
+                    font-size: 8.5pt;
+                }
+                QPushButton:hover {
+                    background-color: #f3f4f6;
+                }
+            """)
+            sec_btn_style = """
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #1f2328;
+                    border: 1px solid #d0d7de;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 8.5pt;
+                }
+                QPushButton:hover {
+                    border-color: #0969da;
+                    color: #0969da;
+                }
+            """
+            self._btn_fit_all.setStyleSheet(sec_btn_style)
+            self._btn_zoom_in.setStyleSheet(sec_btn_style)
+            self._btn_zoom_out.setStyleSheet(sec_btn_style)
+
+            self._telemetry_label.setStyleSheet("""
+                color: #1f2328;
+                background-color: #ffffff;
+                padding: 3px 8px;
+                border-radius: 4px;
+                border: 1px solid #d0d7de;
+            """)
+            self._status_bar.setStyleSheet("color: #656d76; padding: 2px 4px;")
+
+            self._plot.getPlotItem().setLabel('left', 'Amplitude', color='#24292f')
+            self._plot.getPlotItem().setLabel('bottom', 'Sample Index', color='#24292f')
+            self._zero_line.setPen(pg.mkPen('#d0d7de', width=1, style=Qt.PenStyle.DashLine))
+            self._curve_i.setPen(pg.mkPen('#0969da', width=1.5))
+            self._curve_q.setPen(pg.mkPen('#1a7f37', width=1.5))
+            self._curve_extra.setPen(pg.mkPen('#cf222e', width=1.5))
+            self._vline.setPen(pg.mkPen('#d97706', width=1, style=Qt.PenStyle.DashLine))
+            self._hline.setPen(pg.mkPen('#d0d7de', width=1))
+        else:
+            self._chan_lbl.setStyleSheet("color: #e6edf3;")
+            self._channel_combo.setStyleSheet("""
+                QComboBox {
+                    background-color: #161b22;
+                    color: #f0f6fc;
+                    border: 1px solid #30363d;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    min-width: 150px;
+                    font-weight: 500;
+                }
+                QComboBox:hover {
+                    border-color: #58a6ff;
+                }
+                QComboBox QAbstractItemView {
+                    background-color: #161b22;
+                    color: #f0f6fc;
+                    selection-background-color: #1f6feb;
+                    selection-color: #ffffff;
+                }
+            """)
+            self._btn_zoom_cycles.setStyleSheet("""
+                QPushButton {
+                    background-color: #21262d;
+                    color: #58a6ff;
+                    border: 1px solid #388bfd;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-weight: 600;
+                    font-size: 8.5pt;
+                }
+                QPushButton:hover {
+                    background-color: #388bfd33;
+                }
+            """)
+            sec_btn_style = """
+                QPushButton {
+                    background-color: #21262d;
+                    color: #c9d1d9;
+                    border: 1px solid #30363d;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                    font-size: 8.5pt;
+                }
+                QPushButton:hover {
+                    border-color: #58a6ff;
+                    color: #58a6ff;
+                }
+            """
+            self._btn_fit_all.setStyleSheet(sec_btn_style)
+            self._btn_zoom_in.setStyleSheet(sec_btn_style)
+            self._btn_zoom_out.setStyleSheet(sec_btn_style)
+
+            self._telemetry_label.setStyleSheet("""
+                color: #c9d1d9;
+                background-color: #161b22;
+                padding: 3px 8px;
+                border-radius: 4px;
+                border: 1px solid #30363d;
+            """)
+            self._status_bar.setStyleSheet("color: #8b949e; padding: 2px 4px;")
+
+            self._plot.getPlotItem().setLabel('left', 'Amplitude', color='#c9d1d9')
+            self._plot.getPlotItem().setLabel('bottom', 'Sample Index', color='#c9d1d9')
+            self._zero_line.setPen(pg.mkPen('#30363d', width=1, style=Qt.PenStyle.DashLine))
+            self._curve_i.setPen(pg.mkPen('#58a6ff', width=1.5))
+            self._curve_q.setPen(pg.mkPen('#3fb950', width=1.5))
+            self._curve_extra.setPen(pg.mkPen('#f78166', width=1.5))
+            self._vline.setPen(pg.mkPen('#e3b341', width=1, style=Qt.PenStyle.DashLine))
+            self._hline.setPen(pg.mkPen('#484f58', width=1))
+

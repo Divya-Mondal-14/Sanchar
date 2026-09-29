@@ -65,6 +65,7 @@ class BitstreamPanel(QWidget):
         super().__init__(parent)
         self._bits: np.ndarray | None = None
         self._header_end_bit: int = 0
+        self._theme: str = "dark"
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -80,10 +81,10 @@ class BitstreamPanel(QWidget):
         hdr_row = QHBoxLayout()
         hdr_row.setSpacing(8)
 
-        title = QLabel("Decoded Bitstream")
-        title.setFont(QFont("Inter", 10, QFont.Weight.DemiBold))
-        title.setStyleSheet("color: #e6edf3;")
-        hdr_row.addWidget(title)
+        self._title = QLabel("Decoded Bitstream")
+        self._title.setFont(QFont("Inter", 10, QFont.Weight.DemiBold))
+        self._title.setStyleSheet("color: #e6edf3;")
+        hdr_row.addWidget(self._title)
 
         self._legend_header = QLabel("  Header  ")
         self._legend_header.setStyleSheet(
@@ -117,9 +118,10 @@ class BitstreamPanel(QWidget):
         root.addLayout(hdr_row)
 
         # ── Splitter: binary | hex dump ──────────────────────────────
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(4)
-        splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+        self._splitter = QSplitter(Qt.Orientation.Horizontal)
+        self._splitter.setHandleWidth(4)
+        self._splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+        splitter = self._splitter
 
         _text_style = """
             QPlainTextEdit {
@@ -211,6 +213,9 @@ class BitstreamPanel(QWidget):
 
         # Apply header highlight
         if header_end > 0:
+            h_bg = QColor("#fff8c5") if self._theme == "light" else QColor(_HEADER_BG)
+            h_fg = QColor("#9a6700") if self._theme == "light" else QColor(_HEADER_FG)
+
             # Convert bit position to character position:
             # Every 8 bits = 9 chars (8 digits + 1 space), except maybe last
             header_chars = (header_end // 8) * 9 + (header_end % 8)
@@ -219,8 +224,8 @@ class BitstreamPanel(QWidget):
             cursor.setPosition(min(header_chars, len(binary_text)),
                                QTextCursor.MoveMode.KeepAnchor)
             fmt = QTextCharFormat()
-            fmt.setBackground(QColor(_HEADER_BG))
-            fmt.setForeground(QColor(_HEADER_FG))
+            fmt.setBackground(h_bg)
+            fmt.setForeground(h_fg)
             cursor.mergeCharFormat(fmt)
 
         # ── Hex dump view ─────────────────────────────────────────────
@@ -230,6 +235,9 @@ class BitstreamPanel(QWidget):
 
         # Highlight header lines in hex view
         if header_bytes > 0:
+            h_bg = QColor("#fff8c5") if self._theme == "light" else QColor(_HEADER_BG)
+            h_fg = QColor("#9a6700") if self._theme == "light" else QColor(_HEADER_FG)
+
             cursor = self._hex_view.textCursor()
             cursor.setPosition(0)
             # Each line is 16 bytes; header spans first ceil(header_bytes/16) lines
@@ -238,8 +246,8 @@ class BitstreamPanel(QWidget):
                 cursor.movePosition(QTextCursor.MoveOperation.EndOfLine,
                                     QTextCursor.MoveMode.KeepAnchor)
             fmt = QTextCharFormat()
-            fmt.setBackground(QColor(_HEADER_BG))
-            fmt.setForeground(QColor(_HEADER_FG))
+            fmt.setBackground(h_bg)
+            fmt.setForeground(h_fg)
             cursor.mergeCharFormat(fmt)
 
         trunc_note = f"  (showing first {_MAX_BITS_DISPLAYED})" if truncated else ""
@@ -252,3 +260,77 @@ class BitstreamPanel(QWidget):
         """Copy hex dump to clipboard."""
         from PyQt6.QtWidgets import QApplication
         QApplication.clipboard().setText(self._hex_view.toPlainText())
+
+    # ------------------------------------------------------------------
+    # Theme Support
+    # ------------------------------------------------------------------
+
+    def set_theme(self, theme: str = "dark"):
+        """Dynamically apply light or dark theme styling."""
+        self._theme = theme
+        if theme == "light":
+            self._title.setStyleSheet("color: #1f2328;")
+            self._legend_header.setStyleSheet(
+                "background: #fff8c5; color: #9a6700; border: 1px solid #d4a72c; border-radius: 3px; "
+                "padding: 1px 5px; font-size: 8pt;"
+            )
+            self._legend_payload.setStyleSheet(
+                "background: #f6f8fa; color: #1f2328; border: 1px solid #d0d7de; border-radius: 3px; "
+                "padding: 1px 5px; font-size: 8pt;"
+            )
+            self._copy_btn.setStyleSheet("""
+                QPushButton {
+                    background: #ffffff; color: #1f2328;
+                    border: 1px solid #d0d7de; border-radius: 4px;
+                    padding: 0 8px; font-size: 8pt;
+                }
+                QPushButton:hover { background: #f3f4f6; color: #0969da; border-color: #0969da; }
+            """)
+            self._splitter.setStyleSheet("QSplitter::handle { background: #d0d7de; }")
+            text_style = """
+                QPlainTextEdit {
+                    background-color: #ffffff;
+                    color: #1f2328;
+                    border: 1px solid #d0d7de;
+                    border-radius: 4px;
+                    selection-background-color: #b6d3fe;
+                }
+            """
+            self._binary_view.setStyleSheet(text_style)
+            self._hex_view.setStyleSheet(text_style)
+            self._status.setStyleSheet("color: #656d76; padding: 2px 4px;")
+        else:
+            self._title.setStyleSheet("color: #e6edf3;")
+            self._legend_header.setStyleSheet(
+                "background: #3d2b00; color: #ffa657; border-radius: 3px; "
+                "padding: 1px 5px; font-size: 8pt;"
+            )
+            self._legend_payload.setStyleSheet(
+                "background: #161b22; color: #e6edf3; border-radius: 3px; "
+                "padding: 1px 5px; font-size: 8pt;"
+            )
+            self._copy_btn.setStyleSheet("""
+                QPushButton {
+                    background: #21262d; color: #8b949e;
+                    border: 1px solid #30363d; border-radius: 4px;
+                    padding: 0 8px; font-size: 8pt;
+                }
+                QPushButton:hover { background: #30363d; color: #e6edf3; }
+            """)
+            self._splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+            text_style = """
+                QPlainTextEdit {
+                    background-color: #0d1117;
+                    color: #e6edf3;
+                    border: 1px solid #30363d;
+                    border-radius: 4px;
+                    selection-background-color: #264f78;
+                }
+            """
+            self._binary_view.setStyleSheet(text_style)
+            self._hex_view.setStyleSheet(text_style)
+            self._status.setStyleSheet("color: #484f58; padding: 2px 4px;")
+
+        if self._bits is not None:
+            self.set_data(self._bits, self._header_end_bit)
+

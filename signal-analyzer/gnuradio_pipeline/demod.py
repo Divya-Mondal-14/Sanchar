@@ -31,6 +31,7 @@ Public API
 ----------
     demodulate(iq_samples, modulation_class, sample_rate, samples_per_symbol) -> np.ndarray
     estimate_samples_per_symbol(complex_samples, sample_rate) -> int
+    recover_constellation_symbols(complex_samples, sample_rate, sps, mod_class, cfo_hz, loop_bw, damping) -> np.ndarray
 """
 
 from __future__ import annotations
@@ -363,6 +364,160 @@ def demodulate(
     fg.wait()
 
     return bits
+
+
+# ---------------------------------------------------------------------------
+# Constellation DSP & Tracking (Matched Filter, Timing Recovery & Costas Loop)
+# ---------------------------------------------------------------------------
+
+def rrc_taps(sps: int, span: int = 8, alpha: float = 0.35) -> np.ndarray:
+    """
+    Compute Root-Raised Cosine (RRC) matched filter impulse response taps.
+    """
+    n_taps = span * sps + 1
+    t = np.arange(n_taps, dtype=np.float64) - n_taps // 2
+    t_norm = t / sps
+    eps = 1e-8
+    h = np.zeros(n_taps, dtype=np.float64)
+    for i, tn in enumerate(t_norm):
+        if abs(tn) < eps:
+            h[i] = 1.0 + alpha * (4.0 / np.pi - 1.0)
+        elif abs(abs(tn) - 1.0 / (4.0 * alpha)) < eps:
+            h[i] = (alpha / np.sqrt(2.0)) * (
+                (1.0 + 2.0 / np.pi) * np.sin(np.pi / (4.0 * alpha))
+                + (1.0 - 2.0 / np.pi) * np.cos(np.pi / (4.0 * alpha))
+            )
+        else:
+            num = np.sin(np.pi * tn * (1.0 - alpha)) + 4.0 * alpha * tn * np.cos(np.pi * tn * (1.0 + alpha))
+            den = np.pi * tn * (1.0 - (4.0 * alpha * tn) ** 2)
+            h[i] = num / den
+    h /= np.sqrt(np.sum(h ** 2))
+    return h.astype(np.float32)
+
+
+def recover_constellation_symbols(
+    complex_samples: np.ndarray,
+    sample_rate: float,
+    sps: int = 8,
+    mod_class: str = "QPSK",
+    cfo_hz: float | None = None,
+    loop_bw: float = 0.030,
+    damping: float = 0.707,
+) -> np.ndarray:
+    """
+    Apply matched filtering (RRC), symbol timing decimation, and Costas carrier
+    phase tracking to recover tightly-clustered constellation symbols.
+
+    Parameters
+    ----------
+    complex_samples : np.ndarray
+        Raw complex baseband capture samples.
+    sample_rate : float
+        Capture sample rate in Hz.
+    sps : int
+        Estimated or known samples per symbol (>= 2).
+    mod_class : str
+        Modulation scheme name ('BPSK', 'QPSK', 'GMSK', etc.).
+    cfo_hz : float or None
+        Carrier frequency offset in Hz (if estimated).
+    loop_bw : float
+        Normalized Costas loop bandwidth (tuned to 0.02 - 0.04 to minimize jitter).
+    damping : float
+        Costas loop damping factor (0.707 standard critically damped).
+
+    Returns
+    -------
+    np.ndarray, shape (N, 2), dtype float32
+        Recovered and synchronized [I, Q] symbol points on unit circle.
+    """
+    cs = np.asarray(complex_samples, dtype=np.complex64)
+    if len(cs) < 32:
+        return np.stack([cs.real, cs.imag], axis=-1).astype(np.float32)
+
+    # 1. Coarse CFO Correction
+    fs = float(sample_rate) if sample_rate and sample_rate > 0 else 1_000_000.0
+    if cfo_hz is not None and abs(cfo_hz) > 0.1:
+        t = np.arange(len(cs), dtype=np.float64) / fs
+        cs = cs * np.exp(-1j * 2.0 * np.pi * cfo_hz * t).astype(np.complex64)
+
+    # 2. Matched Filtering (Root-Raised Cosine)
+    sps = max(2, int(sps))
+    h = rrc_taps(sps, span=8, alpha=0.35)
+    cs_filtered = np.convolve(cs, h, mode="same")
+
+    # 3. Symbol Timing Recovery (Optimal eye strobe decimation)
+    mod_upper = mod_class.upper()
+    is_qpsk = "QPSK" in mod_upper or "4QAM" in mod_upper
+    is_bpsk = "BPSK" in mod_upper
+
+    n_syms = len(cs_filtered) // sps
+    if n_syms > 4:
+        phase_metrics = []
+        for p_idx in range(sps):
+            sub = cs_filtered[p_idx : p_idx + n_syms * sps : sps]
+            r2 = np.abs(sub) ** 2
+            mean_r2 = np.mean(r2) + 1e-12
+            dispersion = np.mean((r2 - mean_r2) ** 2) / (mean_r2 ** 2)
+            phase_metrics.append(-dispersion)
+        best_phase = int(np.argmax(phase_metrics))
+    else:
+        best_phase = 0
+
+    sym_samples = cs_filtered[best_phase : best_phase + n_syms * sps : sps]
+
+    # 4. 2nd-Order Costas Loop (Carrier Phase & Residual Frequency Tracking)
+    theta = loop_bw / (damping + 0.25 / damping)
+    denom = 1.0 + 2.0 * damping * theta + theta * theta
+    alpha_gain = (4.0 * damping * theta) / denom
+    beta_gain = (4.0 * theta * theta) / denom
+
+    phase = 0.0
+    freq = 0.0
+    recovered_syms = np.zeros(len(sym_samples), dtype=np.complex64)
+
+    for k, s in enumerate(sym_samples):
+        s_rot = s * np.exp(-1j * phase)
+        recovered_syms[k] = s_rot
+
+        I_val = s_rot.real
+        Q_val = s_rot.imag
+        if is_qpsk:
+            # 4th-order QPSK Costas PED
+            e = np.sign(I_val) * Q_val - np.sign(Q_val) * I_val
+        elif is_bpsk:
+            # BPSK Costas PED
+            e = np.sign(I_val) * Q_val
+        else:
+            e = np.sign(I_val) * Q_val
+
+        e = np.clip(e, -1.5, 1.5)
+        freq += beta_gain * e
+        freq = np.clip(freq, -0.1, 0.1)
+        phase += freq + alpha_gain * e
+
+    # Discard acquisition / settling transient
+    settle_count = min(50, len(recovered_syms) // 4)
+    settled = recovered_syms[settle_count:] if len(recovered_syms) > settle_count + 16 else recovered_syms
+
+    # 5. Constellation Phase Alignment to Standard Grid
+    if is_qpsk and len(settled) > 0:
+        z4 = np.mean(settled ** 4)
+        if abs(z4) > 1e-6:
+            angle_error = (np.angle(z4) - np.pi) / 4.0
+            settled = settled * np.exp(-1j * angle_error)
+    elif is_bpsk and len(settled) > 0:
+        z2 = np.mean(settled ** 2)
+        if abs(z2) > 1e-6:
+            angle_error = np.angle(z2) / 2.0
+            settled = settled * np.exp(-1j * angle_error)
+
+    # 6. Normalize RMS Power to 1.0
+    rms = float(np.sqrt(np.mean(settled.real ** 2 + settled.imag ** 2)))
+    if rms > 1e-9:
+        settled = settled / rms
+
+    return np.stack([settled.real, settled.imag], axis=-1).astype(np.float32)
+
 
 
 # ---------------------------------------------------------------------------

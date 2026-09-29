@@ -25,6 +25,7 @@ from __future__ import annotations
 import os
 import sys
 import traceback
+from datetime import datetime
 
 import numpy as np
 from PyQt6.QtWidgets import (
@@ -35,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
 from PyQt6.QtGui import QAction, QIcon, QFont
+from gui.theme import DARK_STYLE, LIGHT_STYLE
 
 # Resolve import paths relative to project root
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -129,16 +131,12 @@ class AnalyzerWorker(QObject):
             from waveform_view import waveform_display_data
             results["waveform"] = waveform_display_data(complex_samples, max_points=32768)
 
-            # IQ for constellation: use a settled window (avoiding turn-on transients)
-            settled_idx = min(1, len(windows) - 1)
-            results["iq_window"] = windows[settled_idx]   # (1024, 2)
-
             # ── 5. Demodulation (GNU Radio) ───────────────────────────
-            self.progress.emit(60, "Demodulating...")
+            self.progress.emit(60, "Demodulating & recovering constellation...")
             decoded_bits = np.array([], dtype=np.uint8)
             sps = 8
             try:
-                from demod import demodulate, estimate_samples_per_symbol
+                from demod import demodulate, estimate_samples_per_symbol, recover_constellation_symbols
                 all_iq = windows.reshape(-1, 2)
                 obw = results.get("occupied_bandwidth_hz")
                 baud_hint = (obw / 1.35) if (obw is not None and obw > 1000) else None
@@ -154,10 +152,35 @@ class AnalyzerWorker(QObject):
                     samples_per_symbol=sps,
                     baud_rate_hint=baud_hint,
                 )
+
+                # Recover synchronized constellation symbols with matched filter & Costas phase tracking
+                try:
+                    rec_const = recover_constellation_symbols(
+                        complex_samples,
+                        sample_rate=float(sr),
+                        sps=sps,
+                        mod_class=ml_result["class"],
+                        cfo_hz=results.get("center_freq_offset_hz"),
+                        loop_bw=0.030,
+                        damping=0.707,
+                    )
+                    if rec_const is not None and len(rec_const) > 0:
+                        results["iq_window"] = rec_const
+                    else:
+                        settled_idx = min(1, len(windows) - 1)
+                        results["iq_window"] = windows[settled_idx]
+                except Exception:
+                    settled_idx = min(1, len(windows) - 1)
+                    results["iq_window"] = windows[settled_idx]
+
             except ImportError as e:
                 results["demod_error"] = f"GNU Radio not available: {e}"
+                settled_idx = min(1, len(windows) - 1)
+                results["iq_window"] = windows[settled_idx]
             except Exception as e:
                 results["demod_error"] = f"Demodulation error: {e}"
+                settled_idx = min(1, len(windows) - 1)
+                results["iq_window"] = windows[settled_idx]
 
             results["sps"] = sps
             results["decoded_bits_raw"] = decoded_bits
@@ -283,12 +306,11 @@ def _fmt_fec(fec_result: dict) -> str:
 class DetachedWindow(QDialog):
     """Floating window to view any diagram in dedicated high resolution."""
 
-    def __init__(self, title: str, widget: QWidget, on_close_callback, parent=None):
+    def __init__(self, title: str, widget: QWidget, on_close_callback, theme="dark", parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"SIH Signal Analyzer — {title}")
         self.resize(1150, 750)
         self.setMinimumSize(700, 450)
-        self.setStyleSheet(_STYLE)
         self._widget = widget
         self._on_close_callback = on_close_callback
 
@@ -298,30 +320,50 @@ class DetachedWindow(QDialog):
 
         # Top bar
         top_bar = QHBoxLayout()
-        title_lbl = QLabel(title)
-        title_lbl.setStyleSheet("font-size: 11pt; font-weight: bold; color: #58a6ff;")
-        top_bar.addWidget(title_lbl)
+        self._title_lbl = QLabel(title)
+        top_bar.addWidget(self._title_lbl)
         top_bar.addStretch(1)
 
-        redock_btn = QPushButton("📥 Re-dock to Main Window")
-        redock_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #21262d;
-                color: #58a6ff;
-                border: 1px solid #388bfd;
-                border-radius: 6px;
-                padding: 5px 14px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background-color: #388bfd33;
-            }
-        """)
-        redock_btn.clicked.connect(self.close)
-        top_bar.addWidget(redock_btn)
+        self._redock_btn = QPushButton("📥 Re-dock to Main Window")
+        self._redock_btn.clicked.connect(self.close)
+        top_bar.addWidget(self._redock_btn)
         layout.addLayout(top_bar)
 
         layout.addWidget(widget)
+        self.set_theme(theme)
+
+    def set_theme(self, theme: str = "dark"):
+        self.setStyleSheet(LIGHT_STYLE if theme == "light" else DARK_STYLE)
+        if theme == "light":
+            self._title_lbl.setStyleSheet("font-size: 11pt; font-weight: bold; color: #0969da;")
+            self._redock_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #ffffff;
+                    color: #0969da;
+                    border: 1px solid #0969da;
+                    border-radius: 6px;
+                    padding: 5px 14px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #f3f4f6;
+                }
+            """)
+        else:
+            self._title_lbl.setStyleSheet("font-size: 11pt; font-weight: bold; color: #58a6ff;")
+            self._redock_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #21262d;
+                    color: #58a6ff;
+                    border: 1px solid #388bfd;
+                    border-radius: 6px;
+                    padding: 5px 14px;
+                    font-weight: 600;
+                }
+                QPushButton:hover {
+                    background-color: #388bfd33;
+                }
+            """)
 
     def closeEvent(self, event):
         self._on_close_callback(self._widget)
@@ -332,120 +374,8 @@ class DetachedWindow(QDialog):
 # Main Window
 # ---------------------------------------------------------------------------
 
-_STYLE = """
-QMainWindow, QWidget {
-    background-color: #0d1117;
-    color: #e6edf3;
-    font-family: 'Inter', 'Segoe UI', sans-serif;
-}
-QToolBar {
-    background-color: #161b22;
-    border-bottom: 1px solid #30363d;
-    padding: 4px;
-    spacing: 6px;
-}
-QToolButton {
-    background-color: #21262d;
-    color: #e6edf3;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 5px 12px;
-    font-size: 9pt;
-    min-width: 80px;
-}
-QToolButton:hover {
-    background-color: #388bfd22;
-    border-color: #388bfd;
-    color: #58a6ff;
-}
-QToolButton:pressed {
-    background-color: #388bfd44;
-}
-QTabWidget::pane {
-    border: 1px solid #30363d;
-    background-color: #0d1117;
-    border-radius: 6px;
-    top: -1px;
-}
-QTabBar::tab {
-    background-color: #161b22;
-    color: #8b949e;
-    border: 1px solid #30363d;
-    border-bottom: none;
-    padding: 8px 18px;
-    margin-right: 4px;
-    border-top-left-radius: 6px;
-    border-top-right-radius: 6px;
-    font-size: 9pt;
-    font-weight: 500;
-}
-QTabBar::tab:hover {
-    background-color: #21262d;
-    color: #c9d1d9;
-}
-QTabBar::tab:selected {
-    background-color: #0d1117;
-    color: #58a6ff;
-    border-color: #30363d;
-    border-bottom: 2px solid #58a6ff;
-    font-weight: 600;
-}
-QPushButton {
-    background-color: #21262d;
-    color: #e6edf3;
-    border: 1px solid #30363d;
-    border-radius: 5px;
-    padding: 4px 10px;
-    font-size: 8pt;
-    font-weight: 500;
-}
-QPushButton:hover {
-    background-color: #30363d;
-    border-color: #58a6ff;
-    color: #58a6ff;
-}
-QPushButton:pressed {
-    background-color: #1f6feb;
-    color: #ffffff;
-}
-QStatusBar {
-    background-color: #161b22;
-    color: #8b949e;
-    font-size: 8pt;
-}
-QProgressBar {
-    background-color: #21262d;
-    border: 1px solid #30363d;
-    border-radius: 4px;
-    text-align: center;
-    color: #e6edf3;
-    height: 14px;
-}
-QProgressBar::chunk {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-        stop:0 #388bfd, stop:1 #58a6ff);
-    border-radius: 3px;
-}
-QSplitter::handle {
-    background: #21262d;
-}
-QMenuBar {
-    background-color: #161b22;
-    color: #e6edf3;
-    border-bottom: 1px solid #30363d;
-}
-QMenuBar::item:selected {
-    background-color: #21262d;
-}
-QMenu {
-    background-color: #161b22;
-    border: 1px solid #30363d;
-}
-QMenu::item:selected {
-    background-color: #21262d;
-    color: #58a6ff;
-}
-"""
+_STYLE = DARK_STYLE
+
 
 
 class MainWindow(QMainWindow):
@@ -458,13 +388,18 @@ class MainWindow(QMainWindow):
         self.resize(1440, 860)
         self.setStyleSheet(_STYLE)
 
+        self._current_theme: str = "dark"
         self._worker: AnalyzerWorker | None = None
         self._thread: QThread | None = None
         self._current_file: str = ""
+        self._last_results: dict | None = None
 
         self._active_detached: dict[str, DetachedWindow] = {}
         self._grid_slots: dict[str, QVBoxLayout] = {}
         self._tab_slots: dict[str, QVBoxLayout] = {}
+        self._grid_cards: list[QFrame] = []
+        self._grid_card_labels: list[QLabel] = []
+        self._tab_banner_labels: list[QLabel] = []
 
         self._build_menu()
         self._build_toolbar()
@@ -488,6 +423,12 @@ class MainWindow(QMainWindow):
         synth_action.setShortcut("Ctrl+G")
         synth_action.triggered.connect(self._open_synthetic)
         file_menu.addAction(synth_action)
+
+        self._report_action = QAction("&Export Analysis Report...", self)
+        self._report_action.setShortcut("Ctrl+R")
+        self._report_action.setEnabled(False)
+        self._report_action.triggered.connect(self._generate_report)
+        file_menu.addAction(self._report_action)
 
         file_menu.addSeparator()
         quit_action = QAction("&Quit", self)
@@ -527,6 +468,12 @@ class MainWindow(QMainWindow):
         sidebar_action.triggered.connect(self._toggle_sidebar)
         view_menu.addAction(sidebar_action)
 
+        view_menu.addSeparator()
+        self._theme_menu_action = QAction("☀️ Switch to Light Theme", self)
+        self._theme_menu_action.setShortcut("Ctrl+T")
+        self._theme_menu_action.triggered.connect(self._toggle_theme)
+        view_menu.addAction(self._theme_menu_action)
+
         help_menu = mb.addMenu("&Help")
         about_action = QAction("&About", self)
         about_action.triggered.connect(self._show_about)
@@ -552,12 +499,25 @@ class MainWindow(QMainWindow):
         self._analyze_btn.triggered.connect(self._run_analysis)
         tb.addAction(self._analyze_btn)
 
+        self._report_btn = QAction("Generate Report", self)
+        self._report_btn.setToolTip("Export a comprehensive PDF or HTML analysis report")
+        self._report_btn.setEnabled(False)
+        self._report_btn.triggered.connect(self._generate_report)
+        tb.addAction(self._report_btn)
+
         tb.addSeparator()
 
         self._sidebar_btn = QAction("Hide Sidebar", self)
         self._sidebar_btn.setToolTip("Toggle parameters sidebar to maximize diagram space")
         self._sidebar_btn.triggered.connect(self._toggle_sidebar)
         tb.addAction(self._sidebar_btn)
+
+        tb.addSeparator()
+
+        self._theme_btn = QAction("☀️ Light Mode", self)
+        self._theme_btn.setToolTip("Toggle between Light and Dark themes (Ctrl+T)")
+        self._theme_btn.triggered.connect(self._toggle_theme)
+        tb.addAction(self._theme_btn)
 
         tb.addSeparator()
 
@@ -614,6 +574,7 @@ class MainWindow(QMainWindow):
 
         for key, title, parent_splitter, tab_idx in configs:
             card = QFrame()
+            self._grid_cards.append(card)
             card.setStyleSheet("""
                 QFrame {
                     background-color: #161b22;
@@ -629,6 +590,7 @@ class MainWindow(QMainWindow):
             header_bar = QHBoxLayout()
             header_bar.setContentsMargins(4, 2, 4, 4)
             lbl = QLabel(title)
+            self._grid_card_labels.append(lbl)
             lbl.setStyleSheet("font-size: 9.5pt; font-weight: 600; color: #58a6ff; border: none;")
             header_bar.addWidget(lbl)
             header_bar.addStretch(1)
@@ -677,6 +639,7 @@ class MainWindow(QMainWindow):
             banner = QHBoxLayout()
             banner.setContentsMargins(4, 2, 4, 4)
             b_lbl = QLabel(full_title)
+            self._tab_banner_labels.append(b_lbl)
             b_lbl.setStyleSheet("font-size: 10pt; font-weight: 600; color: #58a6ff;")
             banner.addWidget(b_lbl)
             banner.addStretch(1)
@@ -747,7 +710,7 @@ class MainWindow(QMainWindow):
         }
         title = title_map.get(key, "Signal Diagram")
 
-        dlg = DetachedWindow(title, panel, lambda w, k=key: self._on_panel_redocked(k), parent=self)
+        dlg = DetachedWindow(title, panel, lambda w, k=key: self._on_panel_redocked(k), theme=self._current_theme, parent=self)
         self._active_detached[key] = dlg
         dlg.show()
 
@@ -760,6 +723,72 @@ class MainWindow(QMainWindow):
         vis = not self._params_panel.isVisible()
         self._params_panel.setVisible(vis)
         self._sidebar_btn.setText("Hide Sidebar" if vis else "Show Sidebar")
+
+    # ------------------------------------------------------------------
+    # Theme Support
+    # ------------------------------------------------------------------
+
+    def _toggle_theme(self):
+        """Toggle between light and dark themes."""
+        new_theme = "light" if self._current_theme == "dark" else "dark"
+        self.set_theme(new_theme)
+
+    def set_theme(self, theme: str = "dark"):
+        """Dynamically apply light or dark theme styling across application."""
+        self._current_theme = theme
+        self.setStyleSheet(LIGHT_STYLE if theme == "light" else DARK_STYLE)
+
+        if theme == "light":
+            self._theme_btn.setText("🌙 Dark Mode")
+            self._theme_btn.setToolTip("Switch to Dark theme (Ctrl+T)")
+            self._theme_menu_action.setText("🌙 Switch to Dark Theme")
+            self._file_label.setStyleSheet("color: #656d76; font-size: 9pt;")
+            self._status_label.setStyleSheet("font-size: 8pt; color: #656d76;")
+
+            card_style = """
+                QFrame {
+                    background-color: #ffffff;
+                    border: 1px solid #d0d7de;
+                    border-radius: 6px;
+                }
+            """
+            for card in self._grid_cards:
+                card.setStyleSheet(card_style)
+            for lbl in self._grid_card_labels:
+                lbl.setStyleSheet("font-size: 9.5pt; font-weight: 600; color: #0969da; border: none;")
+            for b_lbl in self._tab_banner_labels:
+                b_lbl.setStyleSheet("font-size: 10pt; font-weight: 600; color: #0969da;")
+        else:
+            self._theme_btn.setText("☀️ Light Mode")
+            self._theme_btn.setToolTip("Switch to Light theme (Ctrl+T)")
+            self._theme_menu_action.setText("☀️ Switch to Light Theme")
+            self._file_label.setStyleSheet("color: #8b949e; font-size: 9pt;")
+            self._status_label.setStyleSheet("font-size: 8pt; color: #8b949e;")
+
+            card_style = """
+                QFrame {
+                    background-color: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                }
+            """
+            for card in self._grid_cards:
+                card.setStyleSheet(card_style)
+            for lbl in self._grid_card_labels:
+                lbl.setStyleSheet("font-size: 9.5pt; font-weight: 600; color: #58a6ff; border: none;")
+            for b_lbl in self._tab_banner_labels:
+                b_lbl.setStyleSheet("font-size: 10pt; font-weight: 600; color: #58a6ff;")
+
+        # Update any active detached windows
+        for win in self._active_detached.values():
+            win.set_theme(theme)
+
+        # Notify panels
+        self._waveform_panel.set_theme(theme)
+        self._spectrogram_panel.set_theme(theme)
+        self._constellation_panel.set_theme(theme)
+        self._params_panel.set_theme(theme)
+        self._bitstream_panel.set_theme(theme)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -785,6 +814,7 @@ class MainWindow(QMainWindow):
         self._progress.setFixedWidth(200)
         self._progress.setVisible(False)
         sb.addPermanentWidget(self._progress)
+
 
     # ------------------------------------------------------------------
     # Actions
@@ -831,6 +861,8 @@ class MainWindow(QMainWindow):
             return
 
         self._analyze_btn.setEnabled(False)
+        self._report_btn.setEnabled(False)
+        self._report_action.setEnabled(False)
         self._progress.setVisible(True)
         self._progress.setValue(0)
         self._status_label.setText("Analyzing...")
@@ -854,6 +886,9 @@ class MainWindow(QMainWindow):
         self._status_label.setText(msg)
 
     def _on_finished(self, results: dict):
+        self._last_results = results
+        self._report_btn.setEnabled(True)
+        self._report_action.setEnabled(True)
         self._progress.setVisible(False)
         self._progress.setValue(0)
         self._status_label.setText(
@@ -915,6 +950,8 @@ class MainWindow(QMainWindow):
     def _on_error(self, msg: str):
         self._progress.setVisible(False)
         self._analyze_btn.setEnabled(True)
+        self._report_btn.setEnabled(False)
+        self._report_action.setEnabled(False)
         self._status_label.setText("Analysis failed — see error dialog.")
         QMessageBox.critical(self, "Analysis Error", msg)
 
@@ -930,3 +967,87 @@ class MainWindow(QMainWindow):
             "De-interleave: Block / Convolutional / Pseudo-Random<br><br>"
             "Built for SIH 2024."
         )
+
+    def _generate_report(self):
+        """Prompt user to choose destination and export analysis report (PDF or HTML)."""
+        if not self._last_results:
+            QMessageBox.warning(
+                self,
+                "No Analysis Results",
+                "No signal analysis has been completed yet.\n"
+                "Please load and analyze an RF signal before generating a report.",
+            )
+            return
+
+        default_dir = os.path.dirname(self._current_file) if self._current_file else os.getcwd()
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        default_filename = f"signal_analysis_report_{timestamp_str}.pdf"
+        default_path = os.path.join(default_dir, default_filename)
+
+        save_path, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Export Signal Analysis Report",
+            default_path,
+            "PDF Report (*.pdf);;HTML Report (*.html);;All Files (*)",
+        )
+        if not save_path:
+            return
+
+        # Ensure correct extension based on filter or filename
+        if "html" in selected_filter.lower() and not save_path.lower().endswith(".html"):
+            save_path += ".html"
+        elif "pdf" in selected_filter.lower() and not save_path.lower().endswith(".pdf"):
+            save_path += ".pdf"
+
+        try:
+            from gui.report_generator import generate_report
+            out_file = generate_report(
+                results=self._last_results,
+                file_path=self._current_file,
+                output_path=save_path,
+                panels=self._panels,
+            )
+            self._status_label.setText(f"Report exported: {os.path.basename(out_file)}")
+            QMessageBox.information(
+                self,
+                "Report Generated",
+                f"Signal Analysis Report successfully generated and saved to:\n\n{out_file}",
+            )
+        except Exception as e:
+            err_msg = str(e)
+            if save_path.lower().endswith(".pdf"):
+                reply = QMessageBox.question(
+                    self,
+                    "PDF Export Error",
+                    f"PDF generation failed with the following error:\n{err_msg}\n\n"
+                    "Would you like to export as a standalone HTML report instead?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if reply == QMessageBox.StandardButton.Yes:
+                    html_fallback = os.path.splitext(save_path)[0] + ".html"
+                    try:
+                        from gui.report_generator import generate_report
+                        out_file = generate_report(
+                            results=self._last_results,
+                            file_path=self._current_file,
+                            output_path=html_fallback,
+                            panels=self._panels,
+                        )
+                        self._status_label.setText(f"Report exported (HTML fallback): {os.path.basename(out_file)}")
+                        QMessageBox.information(
+                            self,
+                            "Report Generated",
+                            f"HTML report successfully generated and saved to:\n\n{out_file}",
+                        )
+                    except Exception as fallback_err:
+                        QMessageBox.critical(
+                            self,
+                            "Export Failed",
+                            f"HTML fallback export also failed:\n{fallback_err}",
+                        )
+            else:
+                QMessageBox.critical(
+                    self,
+                    "Report Generation Failed",
+                    f"Report generation encountered an error:\n{err_msg}",
+                )

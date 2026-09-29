@@ -22,8 +22,9 @@ from pyqtgraph import ColorMap
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QSplitter, QLabel, QSizePolicy,
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QEvent
 from PyQt6.QtGui import QFont
+from gui.theme import apply_plot_theme, get_info_box_style, format_info_box_html
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,8 @@ class SpectrogramPanel(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self._spectral: dict | None = None
+        self._theme: str = "dark"
+        self._cached_psd_rows: list[tuple[str, str]] | None = None
         self._setup_ui()
 
     # ------------------------------------------------------------------
@@ -70,9 +73,10 @@ class SpectrogramPanel(QWidget):
         root.setContentsMargins(4, 4, 4, 4)
         root.setSpacing(4)
 
-        splitter = QSplitter(Qt.Orientation.Vertical)
-        splitter.setHandleWidth(4)
-        splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+        self._splitter = QSplitter(Qt.Orientation.Vertical)
+        self._splitter.setHandleWidth(4)
+        self._splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+        splitter = self._splitter
 
         # ── Waterfall ────────────────────────────────────────────────
         self._waterfall_plot = pg.PlotWidget()
@@ -121,6 +125,23 @@ class SpectrogramPanel(QWidget):
         self._psd_plot.addItem(self._obw_lo)
         self._psd_plot.addItem(self._obw_hi)
 
+        # ── PSD Information Box (overlay in top-right of plot) ────────
+        self._psd_info_box = QLabel(self._psd_plot)
+        self._psd_info_box.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self._psd_info_box.setStyleSheet("""
+            QLabel {
+                background-color: rgba(22, 27, 34, 215);
+                border: 1px solid #30363d;
+                border-radius: 4px;
+                padding: 4px 6px;
+                color: #c9d1d9;
+                font-family: 'Consolas', 'Segoe UI', monospace;
+                font-size: 7.5pt;
+            }
+        """)
+        self._psd_info_box.hide()
+        self._psd_plot.installEventFilter(self)
+
         splitter.addWidget(self._psd_plot)
         splitter.setSizes([220, 120])
         root.addWidget(splitter)
@@ -138,6 +159,24 @@ class SpectrogramPanel(QWidget):
         root.addWidget(self._info)
 
     # ------------------------------------------------------------------
+    # Event filter for repositioning overlay
+    # ------------------------------------------------------------------
+
+    def eventFilter(self, obj, event):
+        if obj == self._psd_plot and event.type() == QEvent.Type.Resize:
+            self._reposition_psd_info_box()
+        return super().eventFilter(obj, event)
+
+    def _reposition_psd_info_box(self):
+        if hasattr(self, "_psd_info_box") and self._psd_info_box.isVisible():
+            self._psd_info_box.adjustSize()
+            w = self._psd_info_box.width()
+            h = self._psd_info_box.height()
+            x = max(10, self._psd_plot.width() - w - 10)
+            y = 10
+            self._psd_info_box.move(x, y)
+
+    # ------------------------------------------------------------------
     # Public slots
     # ------------------------------------------------------------------
 
@@ -147,8 +186,10 @@ class SpectrogramPanel(QWidget):
 
     def clear(self):
         self._spectral = None
+        self._cached_psd_rows = None
         self._img_item.clear()
         self._psd_curve.setData([], [])
+        self._psd_info_box.hide()
         self._info.setText("No data loaded.")
 
     # ------------------------------------------------------------------
@@ -164,8 +205,8 @@ class SpectrogramPanel(QWidget):
         spec_freqs = self._spectral.get("spec_freqs")
         freqs     = self._spectral.get("freqs")
         psd_db    = self._spectral.get("psd_db")
-        obw       = self._spectral.get("occupied_bandwidth_hz", 0)
-        offset    = self._spectral.get("center_freq_offset_hz", 0)
+        obw       = self._spectral.get("occupied_bandwidth_hz")
+        offset    = self._spectral.get("center_freq_offset_hz")
 
         # --- Waterfall ---
         if spec_db is not None and spec_times is not None and spec_freqs is not None:
@@ -192,10 +233,11 @@ class SpectrogramPanel(QWidget):
             self._psd_curve.setData(freqs.tolist(), psd_db.tolist())
 
             # OBW markers
-            if obw > 0:
+            if obw is not None and obw > 0:
                 half = obw / 2.0
-                lo = offset - half
-                hi = offset + half
+                off_val = offset if offset is not None else 0.0
+                lo = off_val - half
+                hi = off_val + half
                 self._obw_lo.setPos(lo)
                 self._obw_hi.setPos(hi)
                 self._obw_lo.setVisible(True)
@@ -204,7 +246,115 @@ class SpectrogramPanel(QWidget):
                 self._obw_lo.setVisible(False)
                 self._obw_hi.setVisible(False)
 
+            # --- PSD Information Box Content ---
+            if len(psd_db) > 0 and len(freqs) > 0:
+                p_idx = int(np.argmax(psd_db))
+                peak_psd_str = f"{float(psd_db[p_idx]):.1f} dB"
+                peak_f = float(freqs[p_idx])
+                if abs(peak_f) >= 1e6:
+                    peak_freq_str = f"{peak_f / 1e6:+.2f} MHz" if peak_f < 0 else f"{peak_f / 1e6:.2f} MHz"
+                elif abs(peak_f) >= 1e3:
+                    peak_freq_str = f"{peak_f / 1e3:+.2f} kHz" if peak_f < 0 else f"{peak_f / 1e3:.2f} kHz"
+                else:
+                    peak_freq_str = f"{peak_f:+.2f} Hz" if peak_f < 0 else f"{peak_f:.2f} Hz"
+
+                noise_floor_str = f"{float(np.percentile(psd_db, 10)):.1f} dB"
+            else:
+                peak_psd_str = "N/A"
+                peak_freq_str = "N/A"
+                noise_floor_str = "N/A"
+
+            if offset is not None:
+                if abs(offset) >= 1e6:
+                    cfo_str = f"{offset / 1e6:+.2f} MHz"
+                elif abs(offset) >= 1e3:
+                    cfo_str = f"{offset / 1e3:+.2f} kHz"
+                else:
+                    cfo_str = f"{offset:+.2f} Hz"
+            else:
+                cfo_str = "N/A"
+
+            if obw is not None and obw > 0:
+                if obw >= 1e6:
+                    obw_str = f"{obw / 1e6:.2f} MHz"
+                elif obw >= 1e3:
+                    obw_str = f"{obw / 1e3:.2f} kHz"
+                else:
+                    obw_str = f"{obw:.2f} Hz"
+            else:
+                obw_str = "N/A"
+
+            self._cached_psd_rows = [
+                ("Center Offset", cfo_str),
+                ("Occupied BW", obw_str),
+                ("Peak Frequency", peak_freq_str),
+                ("Peak PSD", peak_psd_str),
+                ("Noise Floor", noise_floor_str),
+            ]
+            self._psd_info_box.setText(
+                format_info_box_html("PSD INFORMATION", self._cached_psd_rows, self._theme)
+            )
+            self._psd_info_box.show()
+            self._reposition_psd_info_box()
+
+        obw_val = obw if obw is not None else 0
+        off_val = offset if offset is not None else 0
         self._info.setText(
-            f"OBW: {obw / 1e3:.2f} kHz  |  "
-            f"Center offset: {offset / 1e3:.2f} kHz"
+            f"OBW: {obw_val / 1e3:.2f} kHz  |  "
+            f"Center offset: {off_val / 1e3:.2f} kHz"
         )
+
+    # ------------------------------------------------------------------
+    # Theme Support
+    # ------------------------------------------------------------------
+
+    def set_theme(self, theme: str = "dark"):
+        """Dynamically apply light or dark theme styling."""
+        self._theme = theme
+        apply_plot_theme(self._psd_plot, theme)
+        apply_plot_theme(self._waterfall_plot, theme)
+        self._waterfall_plot.showGrid(x=False, y=False)
+
+        self._psd_info_box.setStyleSheet(get_info_box_style(theme))
+        if self._cached_psd_rows and self._psd_info_box.isVisible():
+            self._psd_info_box.setText(
+                format_info_box_html("PSD INFORMATION", self._cached_psd_rows, theme)
+            )
+            self._reposition_psd_info_box()
+
+        if theme == "light":
+            self._splitter.setStyleSheet("QSplitter::handle { background: #d0d7de; }")
+            self._info.setStyleSheet("""
+                color: #1f2328;
+                background-color: #ffffff;
+                padding: 3px 8px;
+                border-radius: 4px;
+                border: 1px solid #d0d7de;
+            """)
+            self._psd_curve.setPen(pg.mkPen(color='#0969da', width=1.5))
+            self._psd_curve.setBrush(pg.mkBrush(9, 105, 218, 30))
+            self._obw_lo.setPen(pg.mkPen('#d97706', width=1.5, style=Qt.PenStyle.DashLine))
+            self._obw_hi.setPen(pg.mkPen('#d97706', width=1.5, style=Qt.PenStyle.DashLine))
+            self._psd_plot.getPlotItem().setLabel('left', 'PSD (dB)', color='#24292f')
+            self._psd_plot.getPlotItem().setLabel('bottom', 'Freq (Hz)', color='#24292f')
+            self._waterfall_plot.getPlotItem().setLabel('left', 'Freq (Hz)', color='#24292f')
+            self._waterfall_plot.getPlotItem().setLabel('bottom', 'Time (s)', color='#24292f')
+        else:
+            self._splitter.setStyleSheet("QSplitter::handle { background: #21262d; }")
+            self._info.setStyleSheet("""
+                color: #c9d1d9;
+                background-color: #161b22;
+                padding: 3px 8px;
+                border-radius: 4px;
+                border: 1px solid #30363d;
+            """)
+            self._psd_curve.setPen(pg.mkPen(color='#58a6ff', width=1.5))
+            self._psd_curve.setBrush(pg.mkBrush(88, 166, 255, 30))
+            self._obw_lo.setPen(pg.mkPen('#f78166', width=1.5, style=Qt.PenStyle.DashLine))
+            self._obw_hi.setPen(pg.mkPen('#f78166', width=1.5, style=Qt.PenStyle.DashLine))
+            self._psd_plot.getPlotItem().setLabel('left', 'PSD (dB)', color='#c9d1d9')
+            self._psd_plot.getPlotItem().setLabel('bottom', 'Freq (Hz)', color='#c9d1d9')
+            self._waterfall_plot.getPlotItem().setLabel('left', 'Freq (Hz)', color='#c9d1d9')
+            self._waterfall_plot.getPlotItem().setLabel('bottom', 'Time (s)', color='#c9d1d9')
+
+

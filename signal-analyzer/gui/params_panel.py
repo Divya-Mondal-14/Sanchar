@@ -36,14 +36,22 @@ _TEXT_PURPLE     = QColor("#d2a8ff")  # Lilac for byte/bit offsets
 _TEXT_MUTED      = QColor("#c9d1d9")  # Bright silver for neutral values
 
 
-def _confidence_colors(conf: float) -> tuple[QColor, QColor]:
-    """Return (bg, fg) QColor pair based on confidence."""
-    if conf >= _GREEN:
-        return _COLOR_GREEN_BG, _COLOR_GREEN_FG
-    elif conf >= _AMBER:
-        return _COLOR_AMBER_BG, _COLOR_AMBER_FG
+def _confidence_colors(conf: float, theme: str = "dark") -> tuple[QColor, QColor]:
+    """Return (bg, fg) QColor pair based on confidence and current theme."""
+    if theme == "light":
+        if conf >= _GREEN:
+            return QColor("#dafbe1"), QColor("#1a7f37")
+        elif conf >= _AMBER:
+            return QColor("#fff8c5"), QColor("#9a6700")
+        else:
+            return QColor("#ffebe9"), QColor("#cf222e")
     else:
-        return _COLOR_RED_BG, _COLOR_RED_FG
+        if conf >= _GREEN:
+            return _COLOR_GREEN_BG, _COLOR_GREEN_FG
+        elif conf >= _AMBER:
+            return _COLOR_AMBER_BG, _COLOR_AMBER_FG
+        else:
+            return _COLOR_RED_BG, _COLOR_RED_FG
 
 
 def _hz_fmt(hz: float | None) -> str:
@@ -62,6 +70,8 @@ class ParamsPanel(QWidget):
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.setMinimumWidth(280)
+        self._theme: str = "dark"
+        self._last_results: dict | None = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -70,15 +80,15 @@ class ParamsPanel(QWidget):
         root.setSpacing(8)
 
         # Title
-        title = QLabel("Detected Parameters")
-        title.setFont(QFont("Inter", 11, QFont.Weight.Bold))
-        title.setStyleSheet("""
+        self._title = QLabel("Detected Parameters")
+        self._title.setFont(QFont("Inter", 11, QFont.Weight.Bold))
+        self._title.setStyleSheet("""
             color: #ffffff;
             border-bottom: 2px solid #58a6ff;
             padding-bottom: 6px;
             letter-spacing: 0.5px;
         """)
-        root.addWidget(title)
+        root.addWidget(self._title)
 
         # Table
         self._table = QTableWidget(0, 2)
@@ -140,15 +150,23 @@ class ParamsPanel(QWidget):
 
     def set_params(self, results: dict):
         """Populate the parameter table from a results dict."""
+        self._last_results = results
         self._table.setRowCount(0)
+
+        is_light = (self._theme == "light")
+        p_name_color = QColor("#1f2328") if is_light else _TEXT_PARAM_NAME
+        cyan_color   = QColor("#0969da") if is_light else _TEXT_CYAN
+        amber_color  = QColor("#9a6700") if is_light else _TEXT_AMBER
+        purple_color = QColor("#8250df") if is_light else _TEXT_PURPLE
+        muted_color  = QColor("#57606a") if is_light else _TEXT_MUTED
 
         def _add(param: str, value: str, conf: float | None = None, text_color: QColor | None = None):
             row = self._table.rowCount()
             self._table.insertRow(row)
 
-            # Parameter Name (Bright crisp white, bold)
+            # Parameter Name
             p_item = QTableWidgetItem(param)
-            p_item.setForeground(QBrush(_TEXT_PARAM_NAME))
+            p_item.setForeground(QBrush(p_name_color))
             p_font = p_item.font()
             p_font.setBold(True)
             p_item.setFont(p_font)
@@ -160,13 +178,13 @@ class ParamsPanel(QWidget):
             v_item.setFont(v_font)
 
             if conf is not None:
-                bg, fg = _confidence_colors(conf)
+                bg, fg = _confidence_colors(conf, self._theme)
                 v_item.setBackground(QBrush(bg))
                 v_item.setForeground(QBrush(fg))
             elif text_color is not None:
                 v_item.setForeground(QBrush(text_color))
             else:
-                v_item.setForeground(QBrush(_TEXT_MUTED))
+                v_item.setForeground(QBrush(muted_color))
 
             self._table.setItem(row, 0, p_item)
             self._table.setItem(row, 1, v_item)
@@ -177,39 +195,39 @@ class ParamsPanel(QWidget):
         conf_str = f"{conf:.1%}" if conf is not None else "None"
         _add("Modulation", f"{mod}  ({conf_str})", conf=conf)
 
-        # ── 2. Spectral & RF Parameters (Cyan) ────────────────────────
+        # ── 2. Spectral & RF Parameters (Cyan/Blue) ───────────────────
         sr = results.get("sample_rate")
-        _add("Sample Rate", _hz_fmt(sr), text_color=_TEXT_CYAN)
+        _add("Sample Rate", _hz_fmt(sr), text_color=cyan_color)
 
         obw = results.get("occupied_bandwidth_hz")
-        _add("Occupied BW", _hz_fmt(obw), text_color=_TEXT_CYAN)
+        _add("Occupied BW", _hz_fmt(obw), text_color=cyan_color)
 
         cfo = results.get("center_freq_offset_hz")
-        _add("Center Freq Offset", _hz_fmt(cfo), text_color=_TEXT_CYAN)
+        _add("Center Freq Offset", _hz_fmt(cfo), text_color=cyan_color)
 
         # ── 3. Coding & Protocols (Amber / Green) ─────────────────────
         di = results.get("deinterleaver", "None")
         if str(di).lower() in ("none", "—", ""):
-            _add("De-interleaver", "None (Direct)", text_color=_TEXT_MUTED)
+            _add("De-interleaver", "None (Direct)", text_color=muted_color)
         else:
             _add("De-interleaver", str(di), conf=0.95)
 
         fec = results.get("fec_scheme", "None")
         fec_score = results.get("fec_score")
         if str(fec).lower() in ("none", "—", "") or fec_score is None or fec_score == 0.0:
-            _add("FEC Scheme", "None (Raw bitstream)", text_color=_TEXT_MUTED)
+            _add("FEC Scheme", "None (Raw bitstream)", text_color=muted_color)
         else:
             fec_str = f"{fec}  ({fec_score:.1%})"
             _add("FEC Scheme", fec_str, conf=fec_score)
 
         # ── 4. Frame & Byte Telemetry (Purple) ────────────────────────
         n_bytes = results.get("decoded_bytes")
-        _add("Decoded Bytes", f"{n_bytes:,}" if n_bytes is not None else "None", text_color=_TEXT_PURPLE)
+        _add("Decoded Bytes", f"{n_bytes:,}" if n_bytes is not None else "None", text_color=purple_color)
 
         h_off = results.get("header_offset")
         p_off = results.get("payload_offset")
-        _add("Header Offset (bits)", str(h_off) if h_off is not None else "None", text_color=_TEXT_PURPLE)
-        _add("Payload Offset (bits)", str(p_off) if p_off is not None else "None", text_color=_TEXT_PURPLE)
+        _add("Header Offset (bits)", str(h_off) if h_off is not None else "None", text_color=purple_color)
+        _add("Payload Offset (bits)", str(p_off) if p_off is not None else "None", text_color=purple_color)
 
         # ── 5. All Probabilities ──────────────────────────────────────
         all_probs = results.get("all_probs", {})
@@ -224,5 +242,96 @@ class ParamsPanel(QWidget):
             self._probs_label.setText("")
 
     def clear(self):
+        self._last_results = None
         self._table.setRowCount(0)
         self._probs_label.setText("")
+
+    # ------------------------------------------------------------------
+    # Theme Support
+    # ------------------------------------------------------------------
+
+    def set_theme(self, theme: str = "dark"):
+        """Dynamically apply light or dark theme styling."""
+        self._theme = theme
+        if theme == "light":
+            self._title.setStyleSheet("""
+                color: #1f2328;
+                border-bottom: 2px solid #0969da;
+                padding-bottom: 6px;
+                letter-spacing: 0.5px;
+            """)
+            self._table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #ffffff;
+                    alternate-background-color: #f6f8fa;
+                    border: 1px solid #d0d7de;
+                    border-radius: 6px;
+                    color: #1f2328;
+                    gridline-color: #eaeef2;
+                }
+                QTableWidget::item {
+                    padding: 6px 10px;
+                    border-bottom: 1px solid #eaeef2;
+                }
+                QHeaderView::section {
+                    background-color: #f6f8fa;
+                    color: #0969da;
+                    font-weight: bold;
+                    font-size: 9pt;
+                    padding: 7px 10px;
+                    border: none;
+                    border-bottom: 2px solid #d0d7de;
+                }
+            """)
+            self._probs_label.setStyleSheet("""
+                QLabel {
+                    color: #1f2328;
+                    background-color: #ffffff;
+                    border: 1px solid #d0d7de;
+                    border-radius: 6px;
+                    padding: 8px 10px;
+                }
+            """)
+        else:
+            self._title.setStyleSheet("""
+                color: #ffffff;
+                border-bottom: 2px solid #58a6ff;
+                padding-bottom: 6px;
+                letter-spacing: 0.5px;
+            """)
+            self._table.setStyleSheet("""
+                QTableWidget {
+                    background-color: #0d1117;
+                    alternate-background-color: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    color: #f0f6fc;
+                    gridline-color: #21262d;
+                }
+                QTableWidget::item {
+                    padding: 6px 10px;
+                    border-bottom: 1px solid #1c2128;
+                }
+                QHeaderView::section {
+                    background-color: #161b22;
+                    color: #58a6ff;
+                    font-weight: bold;
+                    font-size: 9pt;
+                    padding: 7px 10px;
+                    border: none;
+                    border-bottom: 2px solid #30363d;
+                }
+            """)
+            self._probs_label.setStyleSheet("""
+                QLabel {
+                    color: #c9d1d9;
+                    background-color: #161b22;
+                    border: 1px solid #30363d;
+                    border-radius: 6px;
+                    padding: 8px 10px;
+                }
+            """)
+
+        if self._last_results is not None:
+            self.set_params(self._last_results)
+
