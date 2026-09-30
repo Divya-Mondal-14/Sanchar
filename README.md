@@ -279,19 +279,94 @@ $$\tilde{s}[n] = \frac{s[n] - \mu_s}{\max(|I[n]|, |Q[n]|)}$$
 ---
 
 ### 2. Deep Learning 1D Convolutional Neural Network
+
 Automatic Modulation Recognition is formulated as a maximum a posteriori classification problem:
 
-$$\hat{m} = \arg\max_{m \in \mathcal{M}} P(m \mid \mathbf{X})$$
+$$
+\hat{m} = \arg\max_{m \in \mathcal{M}} P(m \mid \mathbf{X})
+$$
 
 where $\mathbf{X} \in \mathbb{R}^{2 \times 1024}$ represents two-channel I/Q tensors.
-1. **Stage 1 (Feature Extraction):** $\mathbf{H}_1 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_1 * \mathbf{X} + \mathbf{b}_1\right)\right)\right)$ with kernel $k=7$.
-2. **Stage 2 (Pattern Synthesis):** $\mathbf{H}_2 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_2 * \mathbf{H}_1 + \mathbf{b}_2\right)\right)\right)$ with kernel $k=5$.
-3. **Stage 3 (Hierarchical Encoding):** $\mathbf{H}_3 = \text{MaxPool}_{2}\left(\text{ReLU}\left(\text{BN}\left(\mathbf{W}_3 * \mathbf{H}_2 + \mathbf{b}_3\right)\right)\right)$ with kernel $k=3$.
+
+1. **Stage 1 (Feature Extraction):**
+
+$$
+\mathbf{H}_1 =
+\text{MaxPool}_{2}
+\left(
+\text{ReLU}
+\left(
+\text{BN}
+\left(
+\mathbf{W}_1 * \mathbf{X} + \mathbf{b}_1
+\right)
+\right)
+\right)
+$$
+
+with kernel $k=7$.
+
+2. **Stage 2 (Pattern Synthesis):**
+
+$$
+\mathbf{H}_2 =
+\text{MaxPool}_{2}
+\left(
+\text{ReLU}
+\left(
+\text{BN}
+\left(
+\mathbf{W}_2 * \mathbf{H}_1 + \mathbf{b}_2
+\right)
+\right)
+\right)
+$$
+
+with kernel $k=5$.
+
+3. **Stage 3 (Hierarchical Encoding):**
+
+$$
+\mathbf{H}_3 =
+\text{MaxPool}_{2}
+\left(
+\text{ReLU}
+\left(
+\text{BN}
+\left(
+\mathbf{W}_3 * \mathbf{H}_2 + \mathbf{b}_3
+\right)
+\right)
+\right)
+$$
+
+with kernel $k=3$.
+
 4. **Adaptive Aggregation & Dense Classification:**
 
-$$\mathbf{z} = \mathbf{W}_{\text{fc2}} \cdot \text{Dropout}_{0.3}\left(\text{ReLU}\left(\mathbf{W}_{\text{fc1}} \cdot \text{AdaptiveAvgPool}(\mathbf{H}_3) + \mathbf{b}_{\text{fc1}}\right)\right) + \mathbf{b}_{\text{fc2}}$$
+$$
+\mathbf{z} =
+\mathbf{W}_{\text{fc2}}
+\cdot
+\text{Dropout}_{0.3}
+\left(
+\text{ReLU}
+\left(
+\mathbf{W}_{\text{fc1}}
+\cdot
+\text{AdaptiveAvgPool}(\mathbf{H}_3)
++
+\mathbf{b}_{\text{fc1}}
+\right)
+\right)
++
+\mathbf{b}_{\text{fc2}}
+$$
 
-$$P(y = c \mid \mathbf{X}) = \frac{e^{z_c}}{\sum_{j=1}^C e^{z_j}}$$
+$$
+P(y=c\mid\mathbf{X}) =
+\frac{e^{z_c}}{\sum_{j=1}^{C}e^{z_j}}
+$$
 
 ---
 
